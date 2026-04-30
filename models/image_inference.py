@@ -146,6 +146,7 @@ def _predict_heuristic(img: Image.Image) -> dict:
       2. Edge density              — real photos have natural texture
       3. Local std-dev             — real photos have varied local patches
     All three features are properly normalised to [0, 1].
+    Threshold tuned for compressed/WhatsApp images (JPEG artifacts reduce edge score).
     """
     arr = np.array(img.resize((224, 224)), dtype=np.float32)
 
@@ -156,37 +157,42 @@ def _predict_heuristic(img: Image.Image) -> dict:
         hist, _ = np.histogram(arr[:, :, ch], bins=64, range=(0, 256))
         hist = hist / (hist.sum() + 1e-9)
         hist_entropy -= float(np.sum(hist * np.log(hist + 1e-9)))
-    hist_entropy /= 3.0                          # average across channels
-    entropy_score = min(hist_entropy / 4.2, 1.0) # properly normalised
+    hist_entropy /= 3.0
+    entropy_score = min(hist_entropy / 4.2, 1.0)
 
-    # ── Feature 2: Gradient magnitude (edge detail) ───────────────────────
+    # ── Feature 2: Gradient magnitude ────────────────────────────────────
+    # Compressed real photos have lower edge density; normalise to 18 (not 25)
     gray = arr.mean(axis=2)
     gx   = np.diff(gray, axis=1)
     gy   = np.diff(gray, axis=0)
-    edge_density  = float(np.mean(np.abs(gx))) + float(np.mean(np.abs(gy)))
-    edge_score    = min(edge_density / 25.0, 1.0)  # calibrated to real photos
+    edge_density = float(np.mean(np.abs(gx))) + float(np.mean(np.abs(gy)))
+    edge_score   = min(edge_density / 18.0, 1.0)   # ← lowered from 25→18
 
     # ── Feature 3: Local patch std-dev (texture variety) ─────────────────
     patch_size = 32
     local_stds = []
-    for i in range(0, 192, patch_size):   # 6×6 grid of 32×32 patches
+    for i in range(0, 192, patch_size):
         for j in range(0, 192, patch_size):
             patch = arr[i:i + patch_size, j:j + patch_size, :]
             local_stds.append(float(np.std(patch)))
-    std_score = min(float(np.mean(local_stds)) / 40.0, 1.0)
+    std_score = min(float(np.mean(local_stds)) / 35.0, 1.0)  # ← lowered 40→35
 
-    # ── Combine (weighted average) ────────────────────────────────────────
+    # ── Combined score ────────────────────────────────────────────────────
     score = 0.35 * entropy_score + 0.35 * edge_score + 0.30 * std_score
 
-    # Real photos typically score > 0.38; AI images tend to be smoother
-    REAL_THRESHOLD = 0.38
-
-    if score >= REAL_THRESHOLD:
+    # Three zones:
+    #   score >= 0.40  → clearly real  (normal/uncompressed photos)
+    #   score >= 0.22  → likely real   (compressed/WhatsApp/blurry photos)
+    #   score <  0.22  → likely fake   (smooth AI-gen, flat images)
+    if score >= 0.40:
         result     = "real"
-        confidence = round(0.50 + score * 0.45, 4)
+        confidence = round(0.55 + score * 0.40, 4)
+    elif score >= 0.22:
+        result     = "real"           # compressed photo, still real
+        confidence = round(0.52 + score * 0.25, 4)
     else:
         result     = "fake"
-        confidence = round(0.50 + (REAL_THRESHOLD - score) / REAL_THRESHOLD * 0.40, 4)
+        confidence = round(0.55 + (0.22 - score) / 0.22 * 0.35, 4)
 
     confidence = min(max(confidence, 0.50), 0.97)
 
