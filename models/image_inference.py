@@ -141,41 +141,54 @@ def _predict_torch(img: Image.Image) -> dict:
 
 def _predict_heuristic(img: Image.Image) -> dict:
     """
-    Fallback heuristic using colour histogram entropy & edge density.
-    Real photos typically have:
-    - Higher entropy (diverse colours)
-    - Sharper edges (natural textures)
-    AI-generated images often have smoother, overly uniform patches.
+    Improved heuristic using three calibrated features:
+      1. Colour histogram entropy  — real photos have diverse colours
+      2. Edge density              — real photos have natural texture
+      3. Local std-dev             — real photos have varied local patches
+    All three features are properly normalised to [0, 1].
     """
     arr = np.array(img.resize((224, 224)), dtype=np.float32)
 
-    # ── Feature 1: Colour histogram entropy ─────────────────────
+    # ── Feature 1: Colour histogram entropy ──────────────────────────────
+    # Theoretical max for 64 bins: ln(64) ≈ 4.16 per channel
     hist_entropy = 0.0
     for ch in range(3):
         hist, _ = np.histogram(arr[:, :, ch], bins=64, range=(0, 256))
         hist = hist / (hist.sum() + 1e-9)
         hist_entropy -= float(np.sum(hist * np.log(hist + 1e-9)))
-    hist_entropy /= 3.0   # average across channels
+    hist_entropy /= 3.0                          # average across channels
+    entropy_score = min(hist_entropy / 4.2, 1.0) # properly normalised
 
-    # ── Feature 2: Gradient magnitude (edge detail) ──────────────
+    # ── Feature 2: Gradient magnitude (edge detail) ───────────────────────
     gray = arr.mean(axis=2)
     gx   = np.diff(gray, axis=1)
     gy   = np.diff(gray, axis=0)
-    edge_density = float(np.mean(np.abs(gx))) + float(np.mean(np.abs(gy)))
+    edge_density  = float(np.mean(np.abs(gx))) + float(np.mean(np.abs(gy)))
+    edge_score    = min(edge_density / 25.0, 1.0)  # calibrated to real photos
 
-    # ── Combine features into a score ───────────────────────────
-    # Higher entropy + higher edges → more likely real
-    # Normalise to ~[0, 1]
-    score = min((hist_entropy / 12.0) * 0.5 + (edge_density / 30.0) * 0.5, 1.0)
+    # ── Feature 3: Local patch std-dev (texture variety) ─────────────────
+    patch_size = 32
+    local_stds = []
+    for i in range(0, 192, patch_size):   # 6×6 grid of 32×32 patches
+        for j in range(0, 192, patch_size):
+            patch = arr[i:i + patch_size, j:j + patch_size, :]
+            local_stds.append(float(np.std(patch)))
+    std_score = min(float(np.mean(local_stds)) / 40.0, 1.0)
 
-    if score >= 0.45:
-        result      = "real"
-        confidence  = round(0.50 + score * 0.45, 4)
+    # ── Combine (weighted average) ────────────────────────────────────────
+    score = 0.35 * entropy_score + 0.35 * edge_score + 0.30 * std_score
+
+    # Real photos typically score > 0.38; AI images tend to be smoother
+    REAL_THRESHOLD = 0.38
+
+    if score >= REAL_THRESHOLD:
+        result     = "real"
+        confidence = round(0.50 + score * 0.45, 4)
     else:
-        result      = "fake"
-        confidence  = round(0.50 + (0.45 - score) * 0.8, 4)
+        result     = "fake"
+        confidence = round(0.50 + (REAL_THRESHOLD - score) / REAL_THRESHOLD * 0.40, 4)
 
-    confidence = min(max(confidence, 0.50), 0.98)
+    confidence = min(max(confidence, 0.50), 0.97)
 
     return {
         "result":     result,
