@@ -6,10 +6,10 @@ import DetectionModeCard from "@/components/DetectionModeCard";
 
 // ── Animation variants ────────────────────────────────────────────────────────
 const fadeUp = {
-  hidden:  { opacity: 0, y: 30 },
+  hidden:  { opacity: 0, y: 20 },
   visible: (i: number = 0) => ({
     opacity: 1, y: 0,
-    transition: { duration: 0.6, delay: i * 0.12, ease: "easeOut" as const },
+    transition: { duration: 0.4, delay: i * 0.08, ease: "easeOut" as const },
   }),
 };
 
