@@ -1,0 +1,43 @@
+# ─── Node / Frontend ───────────────────────────────────────────
+node_modules/
+.next/
+dist/
+build/
+npm-debug.log*
+
+# ─── Environment Variables ──────────────────────────────────────
+.env
+.env.local
+.env.development
+.env.production
+
+# ─── Python / Backend ───────────────────────────────────────────
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.Python
+
+# ─── ML Model Files ─────────────────────────────────────────────
+*.pkl
+*.joblib
+*.h5
+*.pt
+*.pth
+
+# ─── Temp / Upload Files ────────────────────────────────────────
+uploads/
+temp/
+*.tmp
+
+# ─── IDE / OS ───────────────────────────────────────────────────
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# ─── Logs ───────────────────────────────────────────────────────
+*.log
+logs/
