@@ -29,10 +29,15 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# ─── Task 4.11 — CORS middleware (already present, now explicit) ──────────────
+# ─── Task 4.11 — CORS middleware ─────────────────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=[
+        "http://localhost:3000",                          # local dev
+        "https://ai-shield-detection.vercel.app",        # Vercel production
+        "https://ai-shield-detection-samarthsmasher.vercel.app",  # Vercel preview
+        "https://*.vercel.app",                          # all Vercel previews
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
