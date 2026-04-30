@@ -47,9 +47,15 @@ def _get_text_model():
     global _TEXT_MODEL
     if _TEXT_MODEL is None:
         if not os.path.exists(_TEXT_MODEL_PATH):
-            raise HTTPException(
-                status_code=503,
-                detail="Text model not trained yet. Run train_text_model.py first."
+            # Model not found — train it now using the bundled dataset
+            import subprocess
+            train_script = os.path.normpath(
+                os.path.join(BACKEND_DIR, '..', '..', 'models', 'train_text_model.py')
+            )
+            subprocess.run(
+                [sys.executable, train_script],
+                check=True,
+                cwd=os.path.dirname(train_script),
             )
         _TEXT_MODEL = joblib.load(_TEXT_MODEL_PATH)
     return _TEXT_MODEL
