@@ -69,14 +69,17 @@ async def _save_result(
     user_id: Optional[str],
 ) -> None:
     """Async write a DetectionResult document to the detection_results collection."""
-    doc = {
-        "user_id":    user_id,
-        "input_type": input_type,
-        "result":     result,
-        "confidence": confidence,
-        "timestamp":  datetime.now(timezone.utc),
-    }
-    await db["detection_results"].insert_one(doc)
+    try:
+        doc = {
+            "user_id":    user_id,
+            "input_type": input_type,
+            "result":     result,
+            "confidence": confidence,
+            "timestamp":  datetime.now(timezone.utc),
+        }
+        await db["detection_results"].insert_one(doc)
+    except Exception:
+        pass  # Never let DB write failure break the detection response
 
 
 # ─── Task 4.6 — POST /text ────────────────────────────────────────────────────
