@@ -141,17 +141,19 @@ def _predict_torch(img: Image.Image) -> dict:
 
 def _predict_heuristic(img: Image.Image) -> dict:
     """
-    Improved heuristic using three calibrated features:
-      1. Colour histogram entropy  — real photos have diverse colours
-      2. Edge density              — real photos have natural texture
-      3. Local std-dev             — real photos have varied local patches
-    All three features are properly normalised to [0, 1].
-    Threshold tuned for compressed/WhatsApp images (JPEG artifacts reduce edge score).
+    Conservative heuristic: only flags images as FAKE if they are
+    clearly artificial (blank, solid-colour, or completely flat).
+    Real camera photos — including portraits, WhatsApp-compressed,
+    blurry, or low-light shots — are classified as REAL.
+
+    Score bands:
+      score >= 0.12 → REAL  (any photo with meaningful content)
+      score <  0.12 → FAKE  (blank / solid-colour / purely synthetic)
     """
     arr = np.array(img.resize((224, 224)), dtype=np.float32)
 
     # ── Feature 1: Colour histogram entropy ──────────────────────────────
-    # Theoretical max for 64 bins: ln(64) ≈ 4.16 per channel
+    # Max entropy for 64 bins: ln(64) ≈ 4.16 per channel
     hist_entropy = 0.0
     for ch in range(3):
         hist, _ = np.histogram(arr[:, :, ch], bins=64, range=(0, 256))
@@ -161,46 +163,44 @@ def _predict_heuristic(img: Image.Image) -> dict:
     entropy_score = min(hist_entropy / 4.2, 1.0)
 
     # ── Feature 2: Gradient magnitude ────────────────────────────────────
-    # Compressed real photos have lower edge density; normalise to 18 (not 25)
     gray = arr.mean(axis=2)
     gx   = np.diff(gray, axis=1)
     gy   = np.diff(gray, axis=0)
     edge_density = float(np.mean(np.abs(gx))) + float(np.mean(np.abs(gy)))
-    edge_score   = min(edge_density / 18.0, 1.0)   # ← lowered from 25→18
+    edge_score   = min(edge_density / 15.0, 1.0)
 
-    # ── Feature 3: Local patch std-dev (texture variety) ─────────────────
+    # ── Feature 3: Local patch std-dev ───────────────────────────────────
     patch_size = 32
     local_stds = []
     for i in range(0, 192, patch_size):
         for j in range(0, 192, patch_size):
             patch = arr[i:i + patch_size, j:j + patch_size, :]
             local_stds.append(float(np.std(patch)))
-    std_score = min(float(np.mean(local_stds)) / 35.0, 1.0)  # ← lowered 40→35
+    std_score = min(float(np.mean(local_stds)) / 30.0, 1.0)
 
     # ── Combined score ────────────────────────────────────────────────────
     score = 0.35 * entropy_score + 0.35 * edge_score + 0.30 * std_score
 
-    # Three zones:
-    #   score >= 0.40  → clearly real  (normal/uncompressed photos)
-    #   score >= 0.22  → likely real   (compressed/WhatsApp/blurry photos)
-    #   score <  0.22  → likely fake   (smooth AI-gen, flat images)
-    if score >= 0.40:
+    # Very conservative: only flag as FAKE if score is extremely low
+    # (blank image, solid colour, or completely flat pattern)
+    FAKE_THRESHOLD = 0.12
+
+    if score >= FAKE_THRESHOLD:
         result     = "real"
-        confidence = round(0.55 + score * 0.40, 4)
-    elif score >= 0.22:
-        result     = "real"           # compressed photo, still real
-        confidence = round(0.52 + score * 0.25, 4)
+        # Scale confidence: low-texture real photos get ~55%, rich ones ~90%
+        confidence = round(0.52 + min(score, 1.0) * 0.40, 4)
     else:
         result     = "fake"
-        confidence = round(0.55 + (0.22 - score) / 0.22 * 0.35, 4)
+        confidence = round(0.55 + (FAKE_THRESHOLD - score) / FAKE_THRESHOLD * 0.35, 4)
 
-    confidence = min(max(confidence, 0.50), 0.97)
+    confidence = min(max(confidence, 0.52), 0.95)
 
     return {
         "result":     result,
         "confidence": confidence,
         "label":      "Authentic photo" if result == "real" else "Possibly AI-generated / synthetic",
     }
+
 
 
 # ─── Task 3.8 — Local test ────────────────────────────────────────────────────

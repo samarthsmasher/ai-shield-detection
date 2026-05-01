@@ -1,0 +1,388 @@
+=== DESIGN.md.docx ===
+🎨 DESIGN DOCUMENT
+Project: Multi-Modal AI Content & Spam Detection System
+1. 🧠 Design Philosophy
+Core Principle:
+“Minimal, authoritative, tech-driven interface focused on trust and clarity.”
+From your references:
+Templates use bold minimal layouts with clear structure 
+Cybersecurity designs emphasize dark themes + high contrast + trust signals 
+Your System Should Feel Like:
+A cybersecurity tool, not a college project 
+A dashboard, not a website 
+A product, not a demo 
+2. 🎨 Color System
+Primary Palette (inspired by references)
+Purpose
+Color
+Hex
+Background
+Deep Black
+#0A0A0A
+Surface
+Dark Grey
+#121212
+Primary Accent
+Neon Blue
+#00D4FF
+Secondary Accent
+Purple
+#7B61FF
+Success
+Green
+#00FF9C
+Danger (Fake/Spam)
+Red
+#FF4D4D
+Text Primary
+White
+#FFFFFF
+Text Secondary
+Grey
+#A0A0A0
+Design Logic:
+Dark UI = serious + technical 
+Neon accents = AI / futuristic 
+Red/Green = clear decision output 
+3. ✍️ Typography
+Font Style
+Heading: Bold Sans-serif (Poppins / Inter) 
+Body: Clean sans-serif (Inter) 
+Hierarchy
+Element
+Size
+Weight
+Hero Title
+48–64px
+Bold
+Section Title
+28–36px
+Semi-bold
+Body
+14–16px
+Regular
+Labels
+12px
+Medium
+Design Insight:
+Reference templates rely on:
+Bold headlines 
+Minimal paragraphs 
+Strong visual hierarchy 
+4. 📐 Layout Structure
+Overall Layout Pattern
+[ Navbar ][ Hero Section ][ Upload Section ][ Detection Modules ][ Results Display ][ Info Section ][ Footer ]
+4.1 Hero Section (MOST IMPORTANT)
+Structure:
+Left: Title + Description 
+Right: Illustration / AI graphic 
+Content:
+Title:👉 “Detect Fake Content Instantly Using AI” 
+Subtitle:👉 “Analyze images, videos, and text in one unified system” 
+CTA Buttons:
+Upload File 
+Try Demo 
+4.2 Upload Section
+UI Style:
+Card-based (glassmorphism or soft shadow) 
+Components:
+Drag & Drop Box 
+File Type Selector: 
+Image 
+Video 
+Text 
+4.3 Detection Modules (Visual Blocks)
+3 cards side by side:
+Module
+Icon
+Label
+Image Detection
+🖼
+AI Image Detection
+Video Detection
+🎥
+Deepfake Detection
+Text Detection
+💬
+Spam Detection
+4.4 Results Display (Critical UX)
+Output Card:
+Large label: 
+✅ Real 
+❌ Fake 
+⚠ Spam 
+Include:
+Confidence score (optional) 
+Visual indicator (color-coded) 
+5. 🧩 Component Design System
+Buttons
+Rounded corners (8px) 
+Glow effect on hover 
+Primary = Neon Blue 
+Cards
+Background: #121212 
+Border: subtle glow 
+Shadow: soft 
+Inputs
+Dark background 
+White text 
+Focus glow 
+6. 🧱 UI Components
+Required Components:
+Navbar 
+Upload Box 
+Result Card 
+Status Badge 
+Loader (important for UX) 
+7. 🎞️ Motion & Interaction
+Animations:
+Smooth fade-in 
+Hover glow effects 
+Loading spinner during processing 
+Why:
+Modern tech UI = alive, not static
+8. 📱 Responsiveness
+Desktop:
+Grid layout (3 columns) 
+Mobile:
+Stack vertically 
+Large buttons 
+9. 🧠 UX Strategy
+Keep it SIMPLE:
+Don’t make users think.
+Flow:
+Upload 
+Wait 
+Get result 
+That’s it.
+10. 🧪 Visual Identity
+Style Keywords:
+Futuristic 
+Secure 
+Clean 
+Technical 
+
+=== PRD.md.docx ===
+📄 Product Requirements Document (PRD)
+🧩 Product Title
+Multi-Modal AI Content Detection System
+🎯 1. Goals
+Primary Goal
+Develop a unified platform that detects:
+AI-generated images 
+Deepfake/manipulated videos 
+Spam text messages 
+Secondary Goals
+Provide fast, near real-time predictions 
+Ensure ease of use (non-technical users can operate) 
+Build a modular system (each detection module works independently but integrates smoothly) 
+Non-Goals (important for scope control)
+Training large models from scratch 
+Achieving industry-level deepfake detection accuracy 
+Handling massive real-time streaming data 
+👤 2. Target Users
+Students (you + your group) 
+Basic users who want to verify content authenticity 
+Demo audience (faculty, evaluators) 
+🧠 3. User Stories
+Core User Stories
+As a user, I want to upload an image so that I can know if it is AI-generated. 
+As a user, I want to upload a video so that I can detect if it is deepfake/manipulated. 
+As a user, I want to input text/message so that I can check if it is spam. 
+As a user, I want to see results quickly so I don’t wait long. 
+Experience-Based Stories
+As a user, I want a simple interface so I don’t need technical knowledge. 
+As a user, I want clear output (Fake / Real / Spam / Not Spam). 
+As a user, I want the system to handle multiple inputs without crashing. 
+⚙️ 4. Core Features
+4.1 Multi-Modal Detection System
+Accepts: 
+Image (JPG/PNG) 
+Video (MP4) 
+Text input 
+Routes input to correct module 
+4.2 AI Image Detection Module
+Approach (realistic):
+Use pre-trained CNN (e.g., ResNet via TensorFlow or PyTorch) 
+Detect patterns/artifacts from AI-generated images 
+Input: ImageOutput: Real / AI-generated
+4.3 Deepfake Video Detection Module
+Approach (practical, not overkill):
+Extract frames using OpenCV 
+Analyze selected frames (not full video) 
+Use simple classifier or pre-trained model 
+Input: VideoOutput: Real / Deepfake (confidence score optional)
+4.4 Spam Text Detection Module
+Approach:
+Use ML models: 
+Naïve Bayes 
+Logistic Regression 
+Use text vectorization (TF-IDF) 
+Using scikit-learn
+Input: TextOutput: Spam / Not Spam
+4.5 Integrated Platform
+Central controller routes input to modules 
+Displays results in one dashboard 
+4.6 Real-Time Processing
+Target response: 
+Text → < 1 sec 
+Image → 1–3 sec 
+Video → 5–10 sec (after frame extraction) 
+4.7 User Interface
+Option 1 (recommended for you):
+Simple web app using: 
+Flask (Python backend) 
+HTML/CSS frontend 
+Features:
+Upload buttons (image/video) 
+Text input box 
+Result display panel 
+4.8 Lightweight & Efficient Models
+Use: 
+Pre-trained models 
+Reduced frame sampling for video 
+Avoid heavy GPU dependency 
+4.9 Scalability
+Modular architecture: 
+Add audio detection later 
+Add advanced models later 
+🏗️ 5. System Architecture (Simple)
+User Interface (Web App)        ↓Input Handler        ↓---------------------------------| Image Module | Video Module | Text Module |---------------------------------        ↓Prediction Engine        ↓Result Display
+📊 6. Success Metrics
+Functional Metrics
+Image detection working (Yes/No) 
+Video detection working (Yes/No) 
+Text classification accuracy ≥ 85% 
+Performance Metrics
+Response time: 
+Text < 1 sec 
+Image < 3 sec 
+Video < 10 sec 
+Usability Metrics
+User can complete task in < 3 clicks 
+No crashes during demo 
+Academic Metrics
+Clear explanation of: 
+CNN basics 
+Frame extraction 
+NLP classification 
+⚠️ 7. Risks & Constraints
+Risks
+Deepfake detection too complex → Solution: simplify with frame sampling 
+Dataset availability → use public datasets 
+Time constraint → focus on integration, not perfection 
+Constraints
+Limited hardware (no GPU likely) 
+Limited ML experience 
+Academic deadline 
+🧱 8. Tech Stack
+Backend: Python (Flask) 
+ML Libraries: 
+scikit-learn 
+TensorFlow / PyTorch 
+Computer Vision: OpenCV 
+Frontend: HTML, CSS, basic JS 
+🚀 9. MVP (Minimum Viable Product)
+If time is tight, this is your survival version:
+Spam detection (fully working) 
+Image detection (basic classifier) 
+Video detection (frame-based simple logic) 
+Basic UI
+
+=== TECHSTACK.md.docx ===
+🚀 Recommended Tech Stack (2026)
+1. 🎨 Frontend
+✅ Best Choice:
+Next.js (React-based) 
+Tailwind CSS 
+Why this over plain HTML:
+Your project needs: 
+File upload UI 
+Dynamic results 
+Loading states 
+Plain HTML = looks like a form 
+Next.js = looks like a product 
+What you gain:
+Fast UI rendering 
+Clean component structure 
+Easy API integration 
+Brutal truth:
+If you use only HTML/CSS, your project will look basic even if logic is good.
+2. ⚙️ Backend
+✅ Best Choice:
+FastAPI 
+Why NOT Flask:
+Flask is simple—but outdated for serious APIs 
+FastAPI gives: 
+Faster performance 
+Auto API docs 
+Async support 
+Perfect for your project:
+ML model endpoints 
+File uploads (image/video) 
+JSON responses 
+3. 🧠 ML Layer
+Keep this (correct already):
+scikit-learn → spam detection 
+TensorFlow / PyTorch → image/video 
+OpenCV → frame extraction 
+Why:
+Industry standard 
+Easy integration with FastAPI 
+4. 🔐 Authentication
+✅ Best Choice:
+JWT (JSON Web Tokens) 
+Optional (if you want upgrade):
+Firebase Authentication 
+Reality check:
+For college:👉 Simple login system is enough 
+Don’t overbuild OAuth, Google login, etc. 
+5. 🗄️ Database
+✅ Best Choice:
+MongoDB 
+Why:
+Flexible (store results, logs, user data easily) 
+Works well with JSON APIs 
+No complex schema needed 
+What to store:
+User inputs (optional) 
+Detection results 
+Logs 
+6. ☁️ Deployment
+Backend:
+Render (easy + free tier)OR 
+Railway 
+Frontend:
+Vercel 
+Why:
+Fast deployment 
+Free/student-friendly 
+Works perfectly with Next.js 
+7. 🧪 Optional Add-ons (ONLY if time allows)
+Storage (for files):
+Cloudinary 
+Background processing:
+Celery (only if video processing becomes slow) 
+🧱 Final Architecture (Clean & Realistic)
+Frontend (Next.js)        ↓API Calls        ↓Backend (FastAPI)        ↓----------------------------------| Image Model | Video Model | NLP |----------------------------------        ↓Database (MongoDB)
+⚖️ Why This Stack is the BEST Fit
+Compared to your original (Flask + HTML):
+Factor
+Your Old Stack
+New Stack
+UI Quality
+Basic
+Professional
+Performance
+Medium
+High
+Scalability
+Low
+Medium
+Learning Value
+Low
+High
+Demo Impact
+Average
+Strong
+
