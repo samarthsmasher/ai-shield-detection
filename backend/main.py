@@ -14,7 +14,10 @@ from routers import auth, detect
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Run startup tasks before accepting requests."""
-    await ping_db()
+    try:
+        await ping_db()
+    except Exception as e:
+        print(f"[startup] WARNING: MongoDB ping failed: {e} — continuing anyway")
     yield
 
 
