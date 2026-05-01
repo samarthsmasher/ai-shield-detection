@@ -83,7 +83,24 @@ export default function ImageDetectPage() {
           </p>
         </motion.div>
 
-        {/* ── Upload box ──────────────────────────────────────────────────── */}
+        {/* ── Disclaimer banner ───────────────────────────────────────────── */}
+        <motion.div
+          className="mb-8 flex items-start gap-3 rounded-2xl border border-amber-500/20 bg-amber-500/5 px-4 py-3"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.05 }}
+        >
+          <span className="text-amber-400 text-lg mt-0.5">ⓘ</span>
+          <div>
+            <p className="font-inter text-xs font-semibold text-amber-400 mb-0.5">Statistical Analysis</p>
+            <p className="font-inter text-xs text-white/40 leading-relaxed">
+              Image analysis uses colour entropy, edge density, and texture variance heuristics.
+              It reliably detects blank or clearly artificial images. For subtle AI-generated
+              content, a deep-learning model trained on labelled data would be required.
+            </p>
+          </div>
+        </motion.div>
+
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
