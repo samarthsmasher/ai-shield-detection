@@ -5,8 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import UploadBox  from "@/components/UploadBox";
 import Loader     from "@/components/Loader";
 import ResultCard from "@/components/ResultCard";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
+import { API_BASE, wakeBackend, fetchWithTimeout } from "@/lib/api";
 
 interface DetectionResult {
   result:     string;
@@ -22,9 +21,9 @@ export default function VideoDetectPage() {
   const [error,      setError]      = useState<string | null>(null);
   const [fileName,   setFileName]   = useState<string | null>(null);
   const [fileSize,   setFileSize]   = useState<string | null>(null);
-  const [progress,   setProgress]   = useState(0);   // fake progress for UX
+  const [progress,   setProgress]   = useState(0);
+  const [statusMsg,  setStatusMsg]  = useState("Analysing video frames…");
 
-  // Task 6.9: on file select → FormData → POST /api/detect/video
   const handleFileSelect = useCallback(async (file: File) => {
     setIsLoading(true);
     setResult(null);
@@ -32,8 +31,12 @@ export default function VideoDetectPage() {
     setFileName(file.name);
     setFileSize((file.size / (1024 * 1024)).toFixed(1) + " MB");
     setProgress(0);
+    setStatusMsg("Connecting to server…");
 
-    // Fake progress animation while server processes
+    // Wake backend first, then start progress animation
+    await wakeBackend(setStatusMsg, 90_000);
+    setStatusMsg("Analysing video frames…");
+
     const progressInterval = setInterval(() => {
       setProgress((p) => Math.min(p + Math.random() * 8, 85));
     }, 400);
@@ -42,10 +45,11 @@ export default function VideoDetectPage() {
       const formData = new FormData();
       formData.append("file", file);
 
-      const res = await fetch(`${API_BASE}/api/detect/video`, {
-        method: "POST",
-        body:   formData,
-      });
+      const res = await fetchWithTimeout(
+        `${API_BASE}/api/detect/video`,
+        { method: "POST", body: formData },
+        180_000
+      );
 
       clearInterval(progressInterval);
       setProgress(100);
@@ -62,6 +66,7 @@ export default function VideoDetectPage() {
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
       setIsLoading(false);
+      setStatusMsg("Analysing video frames…");
     }
   }, []);
 
@@ -172,7 +177,7 @@ export default function VideoDetectPage() {
         <AnimatePresence mode="wait">
           {isLoading && (
             <motion.div key="loader" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <Loader label="Analysing video frames…" size="md" />
+              <Loader label={statusMsg} size="md" />
             </motion.div>
           )}
 

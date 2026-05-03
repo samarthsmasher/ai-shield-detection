@@ -5,8 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import UploadBox  from "@/components/UploadBox";
 import Loader     from "@/components/Loader";
 import ResultCard from "@/components/ResultCard";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
+import { API_BASE, wakeBackend, fetchWithTimeout } from "@/lib/api";
 
 interface DetectionResult {
   result:     string;
@@ -17,29 +16,36 @@ interface DetectionResult {
 
 // ── Tasks 6.6 & 6.7 — Image Detection Page ────────────────────────────────────
 export default function ImageDetectPage() {
-  const [isLoading, setIsLoading] = useState(false);
-  const [result,    setResult]    = useState<DetectionResult | null>(null);
-  const [error,     setError]     = useState<string | null>(null);
-  const [preview,   setPreview]   = useState<string | null>(null);
+  const [isLoading,  setIsLoading]  = useState(false);
+  const [result,     setResult]     = useState<DetectionResult | null>(null);
+  const [error,      setError]      = useState<string | null>(null);
+  const [preview,    setPreview]    = useState<string | null>(null);
+  const [statusMsg,  setStatusMsg]  = useState<string>("Analysing image authenticity…");
 
-  // Task 6.7: on file select → FormData → POST /api/detect/image
+  // Task 6.7: on file select → wake backend → POST /api/detect/image
   const handleFileSelect = useCallback(async (file: File) => {
     setIsLoading(true);
     setResult(null);
     setError(null);
+    setStatusMsg("Connecting to server…");
 
     // Generate preview URL
     const objectUrl = URL.createObjectURL(file);
     setPreview(objectUrl);
 
     try {
+      // Wake backend (handles Render free-tier cold starts)
+      await wakeBackend(setStatusMsg, 90_000);
+      setStatusMsg("Analysing image authenticity…");
+
       const formData = new FormData();
       formData.append("file", file);
 
-      const res = await fetch(`${API_BASE}/api/detect/image`, {
-        method: "POST",
-        body:   formData,
-      });
+      const res = await fetchWithTimeout(
+        `${API_BASE}/api/detect/image`,
+        { method: "POST", body: formData },
+        120_000
+      );
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -52,6 +58,7 @@ export default function ImageDetectPage() {
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
       setIsLoading(false);
+      setStatusMsg("Analysing image authenticity…");
     }
   }, []);
 
@@ -151,7 +158,7 @@ export default function ImageDetectPage() {
         <AnimatePresence mode="wait">
           {isLoading && (
             <motion.div key="loader" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <Loader label="Analysing image authenticity…" size="md" />
+              <Loader label={statusMsg} size="md" />
             </motion.div>
           )}
 

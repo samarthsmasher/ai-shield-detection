@@ -4,9 +4,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Loader     from "@/components/Loader";
 import ResultCard from "@/components/ResultCard";
-
-// ── API base URL (falls back to localhost for dev) ────────────────────────────
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
+import { API_BASE, wakeBackend, fetchWithTimeout } from "@/lib/api";
 
 interface DetectionResult {
   result:     string;
@@ -17,11 +15,11 @@ interface DetectionResult {
 
 // ── Tasks 6.3, 6.4, 6.5 — Text Detection Page ────────────────────────────────
 export default function TextDetectPage() {
-  // Task 6.4: useState hooks
-  const [inputText, setInputText] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [result,    setResult]    = useState<DetectionResult | null>(null);
-  const [error,     setError]     = useState<string | null>(null);
+  const [inputText,  setInputText]  = useState("");
+  const [isLoading,  setIsLoading]  = useState(false);
+  const [result,     setResult]     = useState<DetectionResult | null>(null);
+  const [error,      setError]      = useState<string | null>(null);
+  const [statusMsg,  setStatusMsg]  = useState("Analysing your message…");
 
   const charLimit = 2000;
 
@@ -32,14 +30,22 @@ export default function TextDetectPage() {
     setIsLoading(true);
     setResult(null);
     setError(null);
+    setStatusMsg("Connecting to server…");
 
     try {
-      // Task 6.4: wire submit to POST /api/detect/text
-      const res = await fetch(`${API_BASE}/api/detect/text`, {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ text: inputText }),
-      });
+      // Wake backend (handles Render free-tier cold starts)
+      await wakeBackend(setStatusMsg, 90_000);
+      setStatusMsg("Analysing your message…");
+
+      const res = await fetchWithTimeout(
+        `${API_BASE}/api/detect/text`,
+        {
+          method:  "POST",
+          headers: { "Content-Type": "application/json" },
+          body:    JSON.stringify({ text: inputText }),
+        },
+        120_000
+      );
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -52,6 +58,7 @@ export default function TextDetectPage() {
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
       setIsLoading(false);
+      setStatusMsg("Analysing your message…");
     }
   }
 
@@ -169,7 +176,7 @@ export default function TextDetectPage() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
             >
-              <Loader label="Analysing your message…" size="md" />
+              <Loader label={statusMsg} size="md" />
             </motion.div>
           )}
 
