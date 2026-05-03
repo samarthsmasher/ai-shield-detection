@@ -32,6 +32,7 @@ const navLinks = [
   { href: "/detect/text",  label: "Text"    },
   { href: "/detect/image", label: "Image"   },
   { href: "/detect/video", label: "Video"   },
+  { href: "/history",      label: "History" },
 ];
 
 // ── Task 5.4 — Navbar Component ─────────────────────────────────────────────

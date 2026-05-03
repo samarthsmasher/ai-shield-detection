@@ -21,4 +21,5 @@ class DetectionResponse(BaseModel):
     result: str
     confidence: float
     input_type: str
+    frames_analysed: Optional[int] = None   # only set for video detections
     timestamp: datetime = Field(default_factory=datetime.utcnow)

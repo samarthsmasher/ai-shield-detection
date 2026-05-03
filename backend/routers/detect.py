@@ -58,7 +58,15 @@ def _get_text_model():
                 cwd=os.path.dirname(train_script),
             )
         _TEXT_MODEL = joblib.load(_TEXT_MODEL_PATH)
+        print("[detect] Text spam model loaded")
     return _TEXT_MODEL
+
+
+# ── Pre-warm text model at startup (avoids slow first request) ────────────────
+try:
+    _get_text_model()
+except Exception as _e:
+    print(f"[detect] WARNING: text model pre-warm failed: {_e}")
 
 
 # ─── Helper: persist DetectionResult to MongoDB (Task 4.9) ───────────────────
@@ -194,7 +202,60 @@ async def detect_video(
     await _save_result("video", result, confidence, user_id)
 
     return DetectionResponse(
-        result     = result,
-        confidence = confidence,
-        input_type = "video",
+        result          = result,
+        confidence      = confidence,
+        input_type      = "video",
+        frames_analysed = prediction.get("frames_analysed"),
     )
+
+
+# ─── GET /history — Detection History Dashboard ──────────────────────────────
+@router.get(
+    "/history",
+    summary="Get recent detection results for the history dashboard",
+)
+async def get_history(
+    limit: int = 50,
+    input_type: Optional[str] = None,   # filter by "text"|"image"|"video"
+):
+    """
+    Returns the last `limit` detection results (newest first) plus aggregate stats.
+    Optionally filter by input_type.
+    """
+    query: dict = {}
+    if input_type and input_type in ("text", "image", "video"):
+        query["input_type"] = input_type
+
+    cursor = db["detection_results"].find(query).sort("timestamp", -1).limit(limit)
+    docs   = await cursor.to_list(length=limit)
+
+    # Serialise ObjectId → string
+    items = []
+    for doc in docs:
+        items.append({
+            "id":         str(doc.get("_id", "")),
+            "input_type": doc.get("input_type", ""),
+            "result":     doc.get("result", ""),
+            "confidence": round(float(doc.get("confidence", 0)), 4),
+            "timestamp":  doc.get("timestamp").isoformat() if doc.get("timestamp") else "",
+            "user_id":    doc.get("user_id"),
+        })
+
+    # Aggregate stats (all time, ignoring current filter)
+    total       = await db["detection_results"].count_documents({})
+    spam_count  = await db["detection_results"].count_documents({"result": "spam"})
+    fake_count  = await db["detection_results"].count_documents({"result": "fake"})
+    real_count  = await db["detection_results"].count_documents({"result": "real"})
+    ham_count   = await db["detection_results"].count_documents({"result": "ham"})
+    text_count  = await db["detection_results"].count_documents({"input_type": "text"})
+    image_count = await db["detection_results"].count_documents({"input_type": "image"})
+    video_count = await db["detection_results"].count_documents({"input_type": "video"})
+
+    return {
+        "items": items,
+        "stats": {
+            "total":     total,
+            "by_type":   {"text": text_count, "image": image_count, "video": video_count},
+            "by_result": {"spam": spam_count, "fake": fake_count, "real": real_count, "ham": ham_count},
+        },
+    }

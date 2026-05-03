@@ -127,13 +127,23 @@ def predict_image(image_bytes: bytes) -> dict:
     features = extract_features(arr)
     X        = np.array([features])
 
-    pred      = int(_CLF.predict(X)[0])           # 0=real, 1=fake
     proba     = _CLF.predict_proba(X)[0]          # [p_real, p_fake]
-    confidence = float(proba[pred])
+    
+    # Since the model is now trained on balanced real-world data,
+    # we can use a standard threshold of 0.50.
+    p_fake = float(proba[1])
+    threshold = 0.50  
+    
+    if p_fake >= threshold:
+        pred = 1
+        raw_conf = p_fake
+    else:
+        pred = 0
+        raw_conf = float(proba[0])
 
-    # Scale to [0.52, 0.97] for display
-    confidence = round(0.52 + confidence * 0.45, 4)
-    confidence = min(max(confidence, 0.52), 0.97)
+    # Scale to [0.52, 0.99] for display
+    confidence = round(0.52 + (raw_conf * 0.47), 4)
+    confidence = min(max(confidence, 0.52), 0.99)
 
     result = "fake" if pred == 1 else "real"
 
