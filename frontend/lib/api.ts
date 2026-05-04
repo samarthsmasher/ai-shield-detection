@@ -12,7 +12,7 @@ export const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:800
  */
 export async function wakeBackend(
   onStatus?: (msg: string) => void,
-  maxWaitMs = 90_000
+  maxWaitMs = 180_000
 ): Promise<boolean> {
   const start = Date.now();
   let attempt = 0;
@@ -32,12 +32,14 @@ export async function wakeBackend(
       if (res.ok) {
         onStatus?.("Backend ready ✓");
         return true;
+      } else {
+        throw new Error(`Server returned ${res.status}`);
       }
     } catch {
       const elapsed = Math.round((Date.now() - start) / 1000);
       onStatus?.(
         attempt === 1
-          ? "Waking up server… this may take ~60s on first use"
+          ? "Waking up server… this may take ~2-3 mins on first use"
           : `Still waking up… ${elapsed}s elapsed`
       );
       await sleep(4_000);

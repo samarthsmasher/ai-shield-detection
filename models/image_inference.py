@@ -122,6 +122,49 @@ def predict_image(image_bytes: bytes) -> dict:
     _initialize()
 
     img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+    
+    # Try to detect and crop face to match the Kaggle dataset distribution
+    try:
+        import cv2
+        img_np = np.array(img)
+        
+        # Downscale for faster face detection
+        max_dim = 800
+        h, w = img_np.shape[:2]
+        scale = 1.0
+        if max(h, w) > max_dim:
+            scale = max_dim / max(h, w)
+            new_w, new_h = int(w * scale), int(h * scale)
+            detect_img = cv2.resize(img_np, (new_w, new_h))
+        else:
+            detect_img = img_np
+
+        gray = cv2.cvtColor(detect_img, cv2.COLOR_RGB2GRAY)
+        cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
+        face_cascade = cv2.CascadeClassifier(cascade_path)
+        faces = face_cascade.detectMultiScale(gray, 1.1, 4)
+        
+        if len(faces) > 0:
+            # Crop the largest face
+            faces = sorted(faces, key=lambda x: x[2]*x[3], reverse=True)
+            x, y, fw, fh = faces[0]
+            
+            # Map back to original scale
+            x = int(x / scale)
+            y = int(y / scale)
+            fw = int(fw / scale)
+            fh = int(fh / scale)
+
+            # Add margin
+            margin = int(fw * 0.2)
+            x1 = max(0, x - margin)
+            y1 = max(0, y - margin)
+            x2 = min(w, x + fw + margin)
+            y2 = min(h, y + fh + margin)
+            img = Image.fromarray(img_np[y1:y2, x1:x2])
+    except Exception as e:
+        print(f"[image_inference] Face detection failed: {e}")
+
     arr = np.array(img.resize((224, 224)), dtype=np.float32)
 
     features = extract_features(arr)
@@ -129,8 +172,6 @@ def predict_image(image_bytes: bytes) -> dict:
 
     proba     = _CLF.predict_proba(X)[0]          # [p_real, p_fake]
     
-    # Since the model is now trained on balanced real-world data,
-    # we can use a standard threshold of 0.50.
     p_fake = float(proba[1])
     threshold = 0.50  
     
@@ -141,9 +182,8 @@ def predict_image(image_bytes: bytes) -> dict:
         pred = 0
         raw_conf = float(proba[0])
 
-    # Scale to [0.52, 0.99] for display
-    confidence = round(0.52 + (raw_conf * 0.47), 4)
-    confidence = min(max(confidence, 0.52), 0.99)
+    # True confidence, unscaled
+    confidence = round(raw_conf, 4)
 
     result = "fake" if pred == 1 else "real"
 
@@ -152,6 +192,7 @@ def predict_image(image_bytes: bytes) -> dict:
         "confidence": confidence,
         "label":      "Authentic photo" if result == "real"
                       else "Possibly AI-generated / synthetic",
+        "face_found": len(faces) > 0 if 'faces' in locals() else False
     }
 
 

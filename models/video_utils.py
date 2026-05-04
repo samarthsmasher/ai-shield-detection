@@ -116,21 +116,39 @@ def predict_video(video_path: str, sample_rate: int = 1) -> dict:
 
     confidences  = []
     fake_votes   = 0
+    face_frames  = 0
+    
+    # Store all results in case we need fallback
+    all_results = []
 
     for frame in frames:
         buf = io.BytesIO()
-        frame.save(buf, format="JPEG", quality=85)
+        frame.save(buf, format="PNG")
         img_bytes = buf.getvalue()
 
         frame_result = predict_image(img_bytes)
-        confidences.append(frame_result["confidence"])
-        if frame_result["result"] == "fake":
-            fake_votes += 1
+        all_results.append(frame_result)
+        
+        if frame_result.get("face_found", False):
+            face_frames += 1
+            confidences.append(frame_result["confidence"])
+            if frame_result["result"] == "fake":
+                fake_votes += 1
 
-    mean_conf = float(np.mean(confidences))
-    fake_ratio = fake_votes / len(frames)
+    # Fallback if no faces were found in any frame
+    if face_frames == 0:
+        for res in all_results:
+            confidences.append(res["confidence"])
+            if res["result"] == "fake":
+                fake_votes += 1
+        total_valid = len(all_results)
+    else:
+        total_valid = face_frames
 
-    # Majority vote: if >50% of frames flagged as fake → fake video
+    mean_conf = float(np.mean(confidences)) if confidences else 0.0
+    fake_ratio = fake_votes / total_valid if total_valid > 0 else 0.0
+
+    # Majority vote
     if fake_ratio > 0.5:
         result     = "fake"
         confidence = round(mean_conf, 4)
@@ -141,7 +159,7 @@ def predict_video(video_path: str, sample_rate: int = 1) -> dict:
     return {
         "result":           result,
         "confidence":       confidence,
-        "frames_analysed":  len(frames),
+        "frames_analysed":  total_valid,
         "label":            "Authentic video" if result == "real" else "Possible deepfake / synthetic video",
     }
 

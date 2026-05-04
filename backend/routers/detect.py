@@ -188,7 +188,7 @@ async def detect_video(
         os.write(tmp_fd, video_bytes)
         os.close(tmp_fd)
 
-        prediction = predict_video(tmp_path, sample_rate=1)
+        prediction = predict_video(tmp_path, sample_rate=2)
         result     = prediction["result"]
         confidence = prediction["confidence"]
     finally:

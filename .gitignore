@@ -22,7 +22,6 @@ __pycache__/
 
 # ─── ML Model Files ─────────────────────────────────────────────
 *.pkl
-*.joblib
 *.h5
 *.pt
 *.pth
@@ -31,6 +30,7 @@ __pycache__/
 uploads/
 temp/
 *.tmp
+real-vs-fake/
 
 # ─── IDE / OS ───────────────────────────────────────────────────
 .vscode/
