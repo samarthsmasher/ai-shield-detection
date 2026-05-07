@@ -14,9 +14,9 @@
 
 | Service  | URL |
 |----------|-----|
-| **Frontend** | https://ai-shield.vercel.app *(update after deployment)* |
-| **Backend API** | https://ai-shield-backend.onrender.com *(update after deployment)* |
-| **API Docs** | https://ai-shield-backend.onrender.com/docs |
+| **Frontend** | https://ai-shield-detection.vercel.app |
+| **Backend API** | https://ai-shield-detection-1.onrender.com |
+| **API Docs** | https://ai-shield-detection-1.onrender.com/docs |
 
 ---
 
@@ -207,7 +207,7 @@ Response:
 
 1. Go to [vercel.com](https://vercel.com) → New Project → Import GitHub repo
 2. Set root directory to `frontend`
-3. Add environment variable: `NEXT_PUBLIC_API_URL=https://your-backend.onrender.com`
+3. Add environment variable: `NEXT_PUBLIC_API_URL=https://ai-shield-detection-1.onrender.com`
 4. Deploy
 
 ---
