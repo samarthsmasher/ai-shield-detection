@@ -127,31 +127,28 @@ def _noise_consistency_score(arrays: list) -> float:
 
 def _color_channel_correlation(arrays: list) -> float:
     """
-    Measure correlation between R, G, B channel inter-frame changes.
+    Measure how uniformly R/G/B channels change between consecutive frames.
 
-    Real cameras: independent sensor channels — low correlation.
-    AI generators: colour synthesis couples channels — HIGH correlation.
-    High score (> 0.92) is suspicious.
+    Real cameras: shot noise is channel-independent — channels change at
+    different rates per-pixel.
+    AI generators: colour is synthesised jointly — channels scale together.
+
+    Returns the mean ratio of min/max channel-diff across frames.
+    High ratio (> 0.90) means channels change in lockstep = suspicious.
     """
     if len(arrays) < 3:
         return 0.0
-    r_diffs, g_diffs, b_diffs = [], [], []
+    ratios = []
     for i in range(1, len(arrays)):
-        diff = arrays[i] - arrays[i - 1]
-        r_diffs.append(np.mean(np.abs(diff[:, :, 0])))
-        g_diffs.append(np.mean(np.abs(diff[:, :, 1])))
-        b_diffs.append(np.mean(np.abs(diff[:, :, 2])))
-
-    def corr(a, b):
-        a, b = np.array(a), np.array(b)
-        if np.std(a) < 1e-9 or np.std(b) < 1e-9:
-            return 1.0
-        return float(np.corrcoef(a, b)[0, 1])
-
-    rg = corr(r_diffs, g_diffs)
-    rb = corr(r_diffs, b_diffs)
-    gb = corr(g_diffs, b_diffs)
-    return float(np.mean([rg, rb, gb]))
+        diff = np.abs(arrays[i] - arrays[i - 1])       # (H, W, 3)
+        ch_means = [np.mean(diff[:, :, c]) for c in range(3)]
+        mn, mx = min(ch_means), max(ch_means)
+        if mx < 0.5:          # nearly static frame — skip
+            continue
+        ratios.append(mn / (mx + 1e-9))
+    if not ratios:
+        return 0.0
+    return float(np.mean(ratios))   # high = channels move together = suspicious
 
 
 def _edge_flicker_index(arrays: list) -> float:
@@ -187,21 +184,24 @@ def _luminance_temporal_std(arrays: list) -> float:
 
 def _frame_similarity_clustering(arrays: list) -> float:
     """
-    Measure how many frames are nearly identical (cosine-like similarity).
+    Measure fraction of CONSECUTIVE frame pairs that are nearly identical.
 
-    AI generation with limited diversity / looping: many very similar frames.
-    Returns fraction of frame-pairs with difference < threshold.
-    High score (> 0.6) is suspicious.
+    AI looping / low-motion AI generation: many consecutive frames are
+    nearly the same.
+    Real action videos: consecutive frames always differ due to motion.
+
+    Returns fraction of consecutive pairs with mean pixel diff < 3% (0.03).
+    High score (> 0.5) is suspicious.
+    NOTE: Values are 0-1 normalised, so threshold must be in [0,1] range.
     """
     if len(arrays) < 4:
         return 0.0
-    flat    = [a.flatten() / 255.0 for a in arrays]
     similar = 0
     total   = 0
-    step    = max(1, len(flat) // 8)    # sample pairs
-    for i in range(0, len(flat) - step, step):
-        diff = np.mean(np.abs(flat[i] - flat[i + step]))
-        if diff < 2.0:    # nearly identical frames
+    for i in range(len(arrays) - 1):
+        # Normalise to 0-1
+        diff = np.mean(np.abs(arrays[i] - arrays[i + 1])) / 255.0
+        if diff < 0.03:   # < 3% mean pixel change = nearly identical
             similar += 1
         total += 1
     return similar / max(total, 1)
@@ -277,10 +277,11 @@ def _score_video(arrays: list) -> tuple:
     #    Real cameras: ncs > 1.5; AI: ncs < 0.5
     s_ncs = max(0.0, min(1.0, 1.0 - (ncs / 2.0)))
 
-    # 3. Color channel correlation — HIGH is suspicious
-    #    Real cameras: R/G/B noise is partially independent (ccc ~0.70-0.85)
-    #    AI generation: colour is synthesised together (ccc > 0.95)
-    s_ccc = max(0.0, min(1.0, (ccc - 0.70) / 0.25)) if ccc > 0.70 else 0.0
+    # 3. Color channel correlation — HIGH ratio means channels move in lockstep
+    #    Fixed: now measures min/max channel diff ratio per consecutive frame
+    #    Real cameras: ratio ~0.50-0.75 (channels differ slightly)
+    #    AI: ratio > 0.88 (channels always scale together)
+    s_ccc = max(0.0, min(1.0, (ccc - 0.75) / 0.20)) if ccc > 0.75 else 0.0
 
     # 4. Edge flicker — HIGH is suspicious for deepfakes (blending artifacts)
     #    Real: efi varies; Deepfakes: efi > 3.0
@@ -303,21 +304,17 @@ def _score_video(arrays: list) -> tuple:
     s_bas = max(0.0, min(1.0, (bas - 1.0) / 0.5)) if bas > 1.0 else 0.0
 
     # ── Weighted combination ─────────────────────────────────────────────────
-    # Tuned weights based on observed AI video scores:
-    # - channel_corr hits 1.0 on every AI video (R/G/B generated together)
-    # - frame_similarity hits 1.0 on AI videos (limited variation)
-    # - edge_flicker is high on deepfakes / AI videos with motion
-    # - motion_smoothness & noise_consistency are UNRELIABLE for
-    #   photorealistic AI videos (they look like real motion)
+    # Balanced weights — no single signal dominates.
+    # fsc and ccc fixed — now score properly for both real and fake.
     weights = {
-        "motion_smoothness":  0.05,   # unreliable for photorealistic AI
-        "noise_consistency":  0.05,   # unreliable for photorealistic AI
-        "channel_corr":       0.35,   # STRONGEST signal — AI couples RGB channels
+        "motion_smoothness":  0.10,
+        "noise_consistency":  0.15,   # reliable — AI noise is too consistent
+        "channel_corr":       0.20,   # fixed — now measures per-pixel independence
         "edge_flicker":       0.18,   # strong for deepfakes
-        "luminance_std":      0.05,   # weak — AI videos have natural luminance
-        "frame_similarity":   0.22,   # STRONG — AI videos repeat patterns
-        "temporal_anomaly":   0.05,   # moderate
-        "block_artifact":     0.05,   # weak signal
+        "luminance_std":      0.10,
+        "frame_similarity":   0.15,   # fixed — now uses correct 0-1 threshold
+        "temporal_anomaly":   0.07,
+        "block_artifact":     0.05,
     }
 
     scores = {
@@ -384,9 +381,9 @@ def predict_video(video_path: str, sample_rate: int = 2) -> dict:
     fake_prob, feature_scores = _score_video(arrays)
 
     # ── Decision threshold ────────────────────────────────────────────────────
-    # Threshold at 0.35 — tuned from real AI video data:
-    # AI videos score ~0.36-0.41 on composite; real videos score lower.
-    FAKE_THRESHOLD = 0.35
+    # Conservative threshold — only flag as fake when there's strong evidence.
+    # Avoids false positives on real videos.
+    FAKE_THRESHOLD = 0.50
 
     if fake_prob >= FAKE_THRESHOLD:
         result     = "fake"
