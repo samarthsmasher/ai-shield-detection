@@ -1,4 +1,7 @@
+import os
 import time
+import threading
+import requests as _requests
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
@@ -10,7 +13,28 @@ from database import ping_db, db
 from routers import auth, detect
 
 
-# ─── Lifespan: startup ping ───────────────────────────────────────────────────
+# ─── Self-ping: keeps Render free tier warm ───────────────────────────────────
+_SELF_URL = os.getenv(
+    "SELF_URL",
+    "https://ai-shield-detection-1.onrender.com/api/health",
+)
+_PING_INTERVAL = 600  # 10 minutes (Render sleeps after 15 min idle)
+
+
+def _self_ping_loop():
+    """Background thread: pings our own health endpoint every 10 minutes."""
+    # Wait 60 s after startup before first ping so the server is fully ready
+    time.sleep(60)
+    while True:
+        try:
+            resp = _requests.get(_SELF_URL, timeout=30)
+            print(f"[self-ping] {datetime.utcnow().isoformat()}Z → HTTP {resp.status_code}")
+        except Exception as exc:
+            print(f"[self-ping] WARNING: ping failed — {exc}")
+        time.sleep(_PING_INTERVAL)
+
+
+# ─── Lifespan: startup tasks + launch self-ping thread ────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Run startup tasks before accepting requests."""
@@ -18,6 +42,12 @@ async def lifespan(app: FastAPI):
         await ping_db()
     except Exception as e:
         print(f"[startup] WARNING: MongoDB ping failed: {e} — continuing anyway")
+
+    # Start self-ping as a daemon thread (dies when the main process exits)
+    ping_thread = threading.Thread(target=_self_ping_loop, daemon=True, name="self-ping")
+    ping_thread.start()
+    print("[startup] Self-ping thread started — pinging every 10 minutes.")
+
     yield
 
 

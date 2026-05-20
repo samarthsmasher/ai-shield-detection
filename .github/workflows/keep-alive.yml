@@ -2,21 +2,66 @@ name: Keep Render Backend Alive
 
 on:
   schedule:
-    # Runs every 14 minutes to prevent Render free tier from sleeping (sleeps after 15 min)
-    - cron: '*/14 * * * *'
-  workflow_dispatch: # Allow manual trigger
+    # Ping every 10 minutes — Render sleeps after 15 min of inactivity
+    - cron: '*/10 * * * *'
+  workflow_dispatch: # Allow manual trigger from GitHub UI
 
 jobs:
   ping:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+
     steps:
-      - name: Ping Render backend health endpoint
+      - name: Ping backend (with retry)
         run: |
-          echo "Pinging backend at $(date)..."
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 https://ai-shield-detection-1.onrender.com/api/health)
-          echo "Response status: $STATUS"
-          if [ "$STATUS" = "200" ]; then
-            echo "✅ Backend is alive!"
+          echo "🏓 Pinging backend at $(date -u)..."
+          
+          # Try up to 3 times with 20s gap (handles cold start)
+          for attempt in 1 2 3; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 45 \
+              https://ai-shield-detection-1.onrender.com/api/health)
+            echo "Attempt $attempt → HTTP $STATUS"
+
+            if [ "$STATUS" = "200" ]; then
+              echo "✅ Backend is ALIVE!"
+              exit 0
+            fi
+
+            if [ "$attempt" -lt 3 ]; then
+              echo "⏳ Waiting 20s before retry..."
+              sleep 20
+            fi
+          done
+
+          echo "⚠️  Backend did not return 200 after 3 attempts (may still be waking up)"
+          # Don't fail the workflow — this is expected on cold starts
+          exit 0
+
+  # Prevents GitHub from disabling the schedule after 60 days of repo inactivity
+  keep-workflow-active:
+    runs-on: ubuntu-latest
+    # Run only on the 1st of every month
+    if: github.event_name == 'schedule'
+    steps:
+      - name: Check if monthly refresh needed
+        run: |
+          DAY=$(date -u +%d)
+          if [ "$DAY" = "01" ]; then
+            echo "SHOULD_REFRESH=true" >> $GITHUB_ENV
           else
-            echo "⚠️ Backend returned status $STATUS (may be waking up)"
+            echo "SHOULD_REFRESH=false" >> $GITHUB_ENV
           fi
+
+      - name: Checkout repo
+        if: env.SHOULD_REFRESH == 'true'
+        uses: actions/checkout@v4
+
+      - name: Commit keep-alive touch file
+        if: env.SHOULD_REFRESH == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          echo "Last workflow refresh: $(date -u)" > .github/keep-alive-refresh.txt
+          git add .github/keep-alive-refresh.txt
+          git commit -m "chore: monthly keep-alive refresh [skip ci]" || echo "Nothing to commit"
+          git push
