@@ -278,8 +278,9 @@ def _score_video(arrays: list) -> tuple:
     s_ncs = max(0.0, min(1.0, 1.0 - (ncs / 2.0)))
 
     # 3. Color channel correlation — HIGH is suspicious
-    #    Real: ccc < 0.80; AI: ccc > 0.92
-    s_ccc = max(0.0, min(1.0, (ccc - 0.75) / 0.20)) if ccc > 0.75 else 0.0
+    #    Real cameras: R/G/B noise is partially independent (ccc ~0.70-0.85)
+    #    AI generation: colour is synthesised together (ccc > 0.95)
+    s_ccc = max(0.0, min(1.0, (ccc - 0.70) / 0.25)) if ccc > 0.70 else 0.0
 
     # 4. Edge flicker — HIGH is suspicious for deepfakes (blending artifacts)
     #    Real: efi varies; Deepfakes: efi > 3.0
@@ -302,15 +303,20 @@ def _score_video(arrays: list) -> tuple:
     s_bas = max(0.0, min(1.0, (bas - 1.0) / 0.5)) if bas > 1.0 else 0.0
 
     # ── Weighted combination ─────────────────────────────────────────────────
-    # Higher weights to the most reliable signals
+    # Tuned weights based on observed AI video scores:
+    # - channel_corr hits 1.0 on every AI video (R/G/B generated together)
+    # - frame_similarity hits 1.0 on AI videos (limited variation)
+    # - edge_flicker is high on deepfakes / AI videos with motion
+    # - motion_smoothness & noise_consistency are UNRELIABLE for
+    #   photorealistic AI videos (they look like real motion)
     weights = {
-        "motion_smoothness":  0.20,   # very reliable
-        "noise_consistency":  0.18,   # very reliable
-        "channel_corr":       0.15,   # reliable
-        "edge_flicker":       0.12,   # reliable for deepfakes
-        "luminance_std":      0.12,   # reliable
-        "frame_similarity":   0.10,   # reliable for looping AI
-        "temporal_anomaly":   0.08,   # moderate
+        "motion_smoothness":  0.05,   # unreliable for photorealistic AI
+        "noise_consistency":  0.05,   # unreliable for photorealistic AI
+        "channel_corr":       0.35,   # STRONGEST signal — AI couples RGB channels
+        "edge_flicker":       0.18,   # strong for deepfakes
+        "luminance_std":      0.05,   # weak — AI videos have natural luminance
+        "frame_similarity":   0.22,   # STRONG — AI videos repeat patterns
+        "temporal_anomaly":   0.05,   # moderate
         "block_artifact":     0.05,   # weak signal
     }
 
@@ -378,8 +384,9 @@ def predict_video(video_path: str, sample_rate: int = 2) -> dict:
     fake_prob, feature_scores = _score_video(arrays)
 
     # ── Decision threshold ────────────────────────────────────────────────────
-    # Threshold at 0.45 — slightly below 0.5 to be more sensitive to AI content
-    FAKE_THRESHOLD = 0.45
+    # Threshold at 0.35 — tuned from real AI video data:
+    # AI videos score ~0.36-0.41 on composite; real videos score lower.
+    FAKE_THRESHOLD = 0.35
 
     if fake_prob >= FAKE_THRESHOLD:
         result     = "fake"
