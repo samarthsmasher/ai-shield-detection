@@ -33,8 +33,16 @@ export default function TextDetectPage() {
     setStatusMsg("Connecting to server…");
 
     try {
-      // Wake backend (handles Render free-tier cold starts)
-      await wakeBackend(setStatusMsg, 90_000);
+      // Wake backend — extended timeout for Render cold starts
+      setStatusMsg("Connecting to server… (first visit may take ~2 min)");
+      const isUp = await wakeBackend(setStatusMsg, 180_000);
+
+      if (!isUp) {
+        throw new Error(
+          "Server is taking too long to wake up. Please wait 1–2 minutes and try again."
+        );
+      }
+
       setStatusMsg("Analysing your message…");
 
       const res = await fetchWithTimeout(

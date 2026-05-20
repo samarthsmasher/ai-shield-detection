@@ -33,8 +33,16 @@ export default function VideoDetectPage() {
     setProgress(0);
     setStatusMsg("Connecting to server…");
 
-    // Wake backend first, then start progress animation
-    await wakeBackend(setStatusMsg, 90_000);
+    // Wake backend first — extended timeout for Render cold starts
+    setStatusMsg("Connecting to server… (first visit may take ~2 min)");
+    const isUp = await wakeBackend(setStatusMsg, 180_000);
+
+    if (!isUp) {
+      setIsLoading(false);
+      setError("Server is taking too long to wake up. Please wait 1–2 minutes and try again.");
+      return;
+    }
+
     setStatusMsg("Analysing video frames…");
 
     const progressInterval = setInterval(() => {
