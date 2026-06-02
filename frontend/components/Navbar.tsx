@@ -38,6 +38,10 @@ const navLinks = [
 // ── Task 5.4 — Navbar Component ─────────────────────────────────────────────
 export default function Navbar() {
   const pathname    = usePathname();
+
+  // Hide on standalone landing pages that have their own nav
+  if (pathname === "/jet") return null;
+
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
